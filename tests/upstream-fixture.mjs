@@ -3,8 +3,11 @@ globalThis.fetch = async (input, init) => {
   const url = new URL(
     typeof input === "string" || input instanceof URL ? input : input.url,
   );
-  if (url.origin !== "https://api.vercel.com")
-    return originalFetch(input, init);
+  if (url.origin !== "https://api.vercel.com") {
+    if (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
+      return originalFetch(input, init);
+    throw new Error("External network access is forbidden in HTTP E2E tests");
+  }
   const headers = new Headers(init?.headers);
   console.log(
     `UPSTREAM_FIXTURE ${JSON.stringify({
