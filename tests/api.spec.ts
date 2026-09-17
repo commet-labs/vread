@@ -57,7 +57,7 @@ test("GET proxy preserves native HTTP contracts and rejects every other method",
     }
     assert.ok(ready, logs);
     const spec = await (await fetch(`${origin}/openapi.json`)).json();
-    assert.equal(spec.info.title, "vercel-read");
+    assert.equal(spec.info.title, "VRead");
     assert.ok(spec.paths["/v9/projects/{idOrName}"].get.responses["200"]);
     assert.ok(spec.paths["/v1/projects/{idOrName}/env/{id}"].get);
     for (const entry of Object.values(spec.paths)) {
@@ -67,10 +67,7 @@ test("GET proxy preserves native HTTP contracts and rejects every other method",
         ["get"],
       );
     }
-    assert.equal(
-      (await fetch(`${origin}/v9/projects/vercel-read`)).status,
-      401,
-    );
+    assert.equal((await fetch(`${origin}/v9/projects/vread`)).status, 401);
     for (const method of [
       "POST",
       "PUT",
@@ -79,7 +76,7 @@ test("GET proxy preserves native HTTP contracts and rejects every other method",
       "HEAD",
       "OPTIONS",
     ]) {
-      for (const path of ["/v9/projects/vercel-read", "/openapi.json"]) {
+      for (const path of ["/v9/projects/vread", "/openapi.json"]) {
         const denied = await fetch(`${origin}${path}`, {
           method,
           headers: { authorization },
@@ -90,7 +87,7 @@ test("GET proxy preserves native HTTP contracts and rejects every other method",
     }
     assert.equal(logs.includes("UPSTREAM_FIXTURE"), false);
     const nativePath =
-      "/v9/projects/vercel-read?teamId=team_example&unknown=a%2Fb&repeat=1&repeat=2";
+      "/v9/projects/vread?teamId=team_example&unknown=a%2Fb&repeat=1&repeat=2";
     const response = await fetch(`${origin}${nativePath}`, {
       headers: {
         authorization,

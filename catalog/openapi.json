@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "vercel-read",
+    "title": "VRead",
     "version": "0.2.0",
     "description": "GET-only proxy for Vercel. Native routes, parameters, response bodies, errors and streams. No operation filtering or redaction.",
     "license": {
@@ -135904,7 +135904,7 @@
       "serviceApiKey": {
         "type": "http",
         "scheme": "bearer",
-        "description": "The vercel-read service key. The proxy supplies its own upstream Vercel token."
+        "description": "The VRead service key. The proxy supplies its own upstream Vercel token."
       }
     }
   }

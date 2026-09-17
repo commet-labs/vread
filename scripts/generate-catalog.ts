@@ -26,7 +26,7 @@ const paths = Object.fromEntries(
 const specification = {
   openapi: upstream.openapi,
   info: {
-    title: "vercel-read",
+    title: "VRead",
     version: "0.2.0",
     description:
       "GET-only proxy for Vercel. Native routes, parameters, response bodies, errors and streams. No operation filtering or redaction.",
@@ -42,7 +42,7 @@ const specification = {
         type: "http",
         scheme: "bearer",
         description:
-          "The vercel-read service key. The proxy supplies its own upstream Vercel token.",
+          "The VRead service key. The proxy supplies its own upstream Vercel token.",
       },
     },
   },

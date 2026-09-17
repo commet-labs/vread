@@ -1,4 +1,4 @@
-# vercel-read
+# VRead
 
 One thin Next.js HTTP proxy for the Vercel REST API.
 
@@ -16,4 +16,4 @@ One thin Next.js HTTP proxy for the Vercel REST API.
 
 Use Node.js 24 and pnpm. Run catalog:check, lint, test:unit, build, typecheck and test:e2e. HTTP E2E uses the real Next.js server with only external Vercel simulated and no external network calls.
 
-Use conventional commits, English artifacts and no AI attribution. Keep the repository private until publication is explicitly authorized.
+Use conventional commits, English artifacts and no AI attribution. The repository is public and MIT licensed. Never commit secrets or deployment-specific configuration.

@@ -1,5 +1,5 @@
 {
-  "name": "vercel-read",
+  "name": "vread",
   "version": "0.2.0",
   "private": true,
   "description": "GET-only HTTP proxy for the Vercel REST API.",
