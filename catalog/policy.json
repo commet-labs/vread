@@ -321,7 +321,10 @@
   },
   "getNamedSandbox": {
     "access": "read",
-    "reason": "Reviewed documented read operation; JSON responses are redacted."
+    "forcedQuery": {
+      "resume": "false"
+    },
+    "reason": "Read-only only with resume=false; callers cannot request sandbox creation."
   },
   "getObservabilityConfigurationProjects": {
     "access": "read",

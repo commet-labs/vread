@@ -7,8 +7,31 @@ globalThis.fetch = async (input, init) => {
     return originalFetch(input, init);
   const headers = new Headers(init?.headers);
   console.log(
-    `UPSTREAM_FIXTURE ${JSON.stringify({ path: url.pathname, method: init?.method, teamId: url.searchParams.get("teamId"), clientHeader: headers.has("x-client-injection"), correctToken: headers.get("authorization") === "Bearer upstream_fixture_credential", redirect: init?.redirect, body: init?.body })}`,
+    `UPSTREAM_FIXTURE ${JSON.stringify({
+      path: url.pathname,
+      method: init?.method,
+      teamId: url.searchParams.get("teamId"),
+      resume: url.searchParams.get("resume"),
+      clientHeader: headers.has("x-client-injection"),
+      correctToken:
+        headers.get("authorization") === "Bearer upstream_fixture_credential",
+      redirect: init?.redirect,
+      body: init?.body,
+    })}`,
   );
+  if (url.pathname.endsWith("/runtime-logs"))
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode(
+              '{"message":"Bearer secret"}\n{"message":"incomplete',
+            ),
+          );
+        },
+      }),
+      { headers: { "Content-Type": "application/stream+json" } },
+    );
   if (url.pathname.endsWith("/redirect"))
     return new Response(null, {
       status: 302,

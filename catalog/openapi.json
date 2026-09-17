@@ -1260,16 +1260,6 @@
         ],
         "parameters": [
           {
-            "name": "ownerId",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "style": "form",
-            "explode": true
-          },
-          {
             "name": "virtualModelSlug",
             "in": "query",
             "required": false,
@@ -1348,16 +1338,6 @@
           "api-ai-gateway"
         ],
         "parameters": [
-          {
-            "name": "ownerId",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "style": "form",
-            "explode": true
-          },
           {
             "name": "vmcSlug",
             "in": "query",
@@ -5548,19 +5528,6 @@
             },
             "style": "form",
             "explode": true
-          },
-          {
-            "name": "resume",
-            "in": "query",
-            "required": false,
-            "description": "Whether to automatically resume a stopped named sandbox by creating a new instance from its snapshot. Defaults to false.",
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "description": "Whether to automatically resume a stopped named sandbox by creating a new instance from its snapshot. Defaults to false."
-            },
-            "style": "form",
-            "explode": true
           }
         ],
         "responses": {
@@ -9697,16 +9664,6 @@
           "api-ai-gateway"
         ],
         "parameters": [
-          {
-            "name": "ownerId",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "style": "form",
-            "explode": true
-          },
           {
             "name": "limit",
             "in": "query",

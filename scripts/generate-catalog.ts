@@ -7,7 +7,14 @@ const upstream = JSON.parse(
 ) as { operations: Operation[]; schemas: Record<string, unknown> };
 const policy = JSON.parse(
   await readFile(new URL("catalog/policy.json", root), "utf8"),
-) as Record<string, { access: "read" | "blocked"; reason: string }>;
+) as Record<
+  string,
+  {
+    access: "read" | "blocked";
+    reason: string;
+    forcedQuery?: Record<string, string>;
+  }
+>;
 const byId = new Map(
   upstream.operations.map((operation) => [operation.operationId, operation]),
 );
@@ -41,7 +48,10 @@ const paths = Object.fromEntries(
         .filter(
           (parameter) =>
             ["path", "query"].includes(parameter.in) &&
-            !["teamId", "slug", "teamSlug"].includes(parameter.name),
+            !["teamId", "slug", "teamSlug", "ownerId"].includes(
+              parameter.name,
+            ) &&
+            !Object.hasOwn(operation.forcedQuery ?? {}, parameter.name),
         )
         .map((parameter) => ({
           name: parameter.name,

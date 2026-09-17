@@ -123,6 +123,23 @@ test("Next.js HTTP boundary enforces read-only access and isolates upstream cred
         400,
       );
     assert.equal(
+      (
+        await fetch(`${origin}/api/getNamedSandbox?name=test&resume=true`, {
+          headers: { authorization },
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await fetch(
+          `${origin}/api/getAiGatewayVirtualModelConfig?ownerId=team_other`,
+          { headers: { authorization } },
+        )
+      ).status,
+      400,
+    );
+    assert.equal(
       logs.includes("UPSTREAM_FIXTURE"),
       false,
       "Denied requests must never reach upstream",
@@ -173,12 +190,28 @@ test("Next.js HTTP boundary enforces read-only access and isolates upstream cred
       { text: "Bearer [REDACTED]" },
       { text: "build complete" },
     ]);
+    const live = await fetch(
+      `${origin}/api/getRuntimeLogs?projectId=prj_fixture&deploymentId=dpl_fixture`,
+      { headers: { authorization } },
+    );
+    assert.equal(live.status, 200);
+    assert.equal(live.headers.get("x-vercel-read-stream-complete"), "false");
+    assert.deepEqual(await live.json(), [{ message: "Bearer [REDACTED]" }]);
+    assert.equal(
+      (
+        await fetch(`${origin}/api/getNamedSandbox?name=test`, {
+          headers: { authorization },
+        })
+      ).status,
+      200,
+    );
     await new Promise((resolve) => setTimeout(resolve, 100));
     const calls = logs
       .split("\n")
       .filter((line) => line.startsWith("UPSTREAM_FIXTURE "))
       .map((line) => JSON.parse(line.slice("UPSTREAM_FIXTURE ".length)));
-    assert.equal(calls.length, 7);
+    assert.equal(calls.length, 9);
+    assert.equal(calls.at(-1).resume, "false");
     for (const call of calls) {
       assert.equal(call.teamId, "team_fixture");
       assert.equal(call.correctToken, true);

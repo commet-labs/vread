@@ -21,10 +21,10 @@ const operations = new Map(
     operation,
   ]),
 );
-const ajv = new Ajv({ strict: false, coerceTypes: true, allErrors: false });
+const ajv = new Ajv({ strict: false, coerceTypes: false, allErrors: false });
 addFormats(ajv);
 const validators = new Map<string, ValidateFunction>();
-const reservedParameters = new Set(["teamId", "slug", "teamSlug"]);
+const reservedParameters = new Set(["teamId", "slug", "teamSlug", "ownerId"]);
 
 export function authenticate(
   authorization: string | null,
@@ -63,10 +63,24 @@ export function resolveOperation(
 function validateInput(key: string, schema: AnySchemaObject, input: unknown) {
   let validator = validators.get(key);
   if (!validator) {
-    validator = ajv.compile({
-      ...schema,
-      components: { schemas: upstream.schemas },
-    });
+    const validationSchema = JSON.parse(
+      JSON.stringify(
+        { ...schema, components: { schemas: upstream.schemas } },
+        (_key, value) => {
+          if (
+            value &&
+            typeof value === "object" &&
+            value.nullable === true &&
+            !value.type
+          ) {
+            const { nullable: _nullable, ...nonNullSchema } = value;
+            return { anyOf: [nonNullSchema, { type: "null" }] };
+          }
+          return value;
+        },
+      ),
+    );
+    validator = ajv.compile(validationSchema);
     validators.set(key, validator);
   }
   if (!validator(input))
@@ -75,6 +89,35 @@ function validateInput(key: string, schema: AnySchemaObject, input: unknown) {
       "invalid_input",
       "Input does not match this operation's schema.",
     );
+}
+
+function parseQueryValue(value: string, schema: AnySchemaObject): unknown {
+  if (["number", "integer"].includes(schema.type)) {
+    if (!value.trim() || !Number.isFinite(Number(value)))
+      throw new RequestError(
+        400,
+        "invalid_number",
+        "Expected a finite number.",
+      );
+    return Number(value);
+  }
+  if (schema.type === "boolean") {
+    if (value !== "true" && value !== "false")
+      throw new RequestError(400, "invalid_boolean", "Expected true or false.");
+    return value === "true";
+  }
+  if (schema.type === "object") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      throw new RequestError(
+        400,
+        "invalid_object",
+        "Expected a JSON object parameter.",
+      );
+    }
+  }
+  return value;
 }
 
 export function buildUpstreamRequest(
@@ -89,13 +132,19 @@ export function buildUpstreamRequest(
   );
   const properties = Object.fromEntries(
     parameters
-      .filter((parameter) => !reservedParameters.has(parameter.name))
+      .filter(
+        (parameter) =>
+          !reservedParameters.has(parameter.name) &&
+          !Object.hasOwn(operation.forcedQuery ?? {}, parameter.name),
+      )
       .map((parameter) => [parameter.name, parameter.schema]),
   );
   const required = parameters
     .filter(
       (parameter) =>
-        parameter.required && !reservedParameters.has(parameter.name),
+        parameter.required &&
+        !reservedParameters.has(parameter.name) &&
+        !Object.hasOwn(operation.forcedQuery ?? {}, parameter.name),
     )
     .map((parameter) => parameter.name);
   const input: Record<string, unknown> = Object.create(null);
@@ -107,7 +156,10 @@ export function buildUpstreamRequest(
         "Unknown or server-owned parameter.",
       );
     const values = search.getAll(name);
-    if (properties[name].type === "array") input[name] = values;
+    if (properties[name].type === "array")
+      input[name] = values.map((value) =>
+        parseQueryValue(value, properties[name].items),
+      );
     else {
       if (values.length !== 1)
         throw new RequestError(
@@ -115,7 +167,7 @@ export function buildUpstreamRequest(
           "duplicate_parameter",
           "Scalar parameters must not be repeated.",
         );
-      input[name] = values[0];
+      input[name] = parseQueryValue(values[0], properties[name]);
     }
   }
   validateInput(
@@ -133,7 +185,7 @@ export function buildUpstreamRequest(
         "Registry reads require a server-configured team slug.",
       );
     const value =
-      parameter.name === "teamId"
+      parameter.name === "teamId" || parameter.name === "ownerId"
         ? teamId
         : parameter.name === "teamSlug"
           ? teamSlug
@@ -176,6 +228,8 @@ export function buildUpstreamRequest(
       "invalid_path",
       "Unable to construct a reviewed path.",
     );
+  for (const [name, value] of Object.entries(operation.forcedQuery ?? {}))
+    query.set(name, value);
   query.set("teamId", teamId);
   const url = new URL(`https://api.vercel.com${path}`);
   url.search = query.toString();

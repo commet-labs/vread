@@ -25,34 +25,48 @@ export function jsonResponse(value: unknown, status = 200): Response {
 async function readBounded(
   stream: ReadableStream<Uint8Array> | null,
   maxBytes: number,
-): Promise<string> {
-  if (!stream) return "";
+  snapshotWindowMs?: number,
+): Promise<{ text: string; truncated: boolean }> {
+  if (!stream) return { text: "", truncated: false };
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
+  let truncated = false;
+  const timer =
+    snapshotWindowMs === undefined
+      ? undefined
+      : setTimeout(() => {
+          truncated = true;
+          void reader.cancel().catch(() => undefined);
+        }, snapshotWindowMs);
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > maxBytes)
+      if (size > maxBytes) {
+        if (snapshotWindowMs !== undefined) {
+          truncated = true;
+          break;
+        }
         throw new RequestError(
           413,
           "payload_too_large",
           "Payload exceeds the service limit.",
         );
+      }
       chunks.push(value);
     }
   } finally {
+    clearTimeout(timer);
     await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return { text: Buffer.concat(chunks).toString("utf8"), truncated };
 }
 
 function decodeResponse(text: string, contentType: string): unknown {
-  if (!text) return null;
-  if (contentType.includes("application/json")) return JSON.parse(text);
+  if (!text) return [];
   if (
     contentType.includes("ndjson") ||
     contentType.includes("jsonl") ||
@@ -74,6 +88,8 @@ function decodeResponse(text: string, contentType: string): unknown {
           .join("\n");
         return payload && payload !== "[DONE]" ? [JSON.parse(payload)] : [];
       });
+  if (contentType.includes("application/json") || contentType.includes("+json"))
+    return JSON.parse(text);
   throw new RequestError(
     502,
     "unsupported_upstream_format",
@@ -117,7 +133,7 @@ export async function handleRead(
         "Upstream credentials and team must be configured separately.",
       );
     let body: unknown;
-    const rawBody = await readBounded(request.body, maxRequestBytes);
+    const { text: rawBody } = await readBounded(request.body, maxRequestBytes);
     if (rawBody) {
       if (
         !request.headers
@@ -184,10 +200,33 @@ export async function handleRead(
     }
     if (operation.method === "HEAD")
       return jsonResponse({ exists: true, upstreamStatus: response.status });
-    let result: unknown;
+    let upstreamPayload: unknown;
+    let streamTruncated = false;
+    const contentType = (
+      response.headers.get("content-type") ?? ""
+    ).toLowerCase();
+    const streaming = /ndjson|jsonl|stream\+json|text\/event-stream/.test(
+      contentType,
+    );
     try {
-      const text = await readBounded(response.body, maxResponseBytes);
-      result = decodeResponse(text, response.headers.get("content-type") ?? "");
+      const snapshot = await readBounded(
+        response.body,
+        maxResponseBytes,
+        streaming ? 5_000 : undefined,
+      );
+      streamTruncated = snapshot.truncated;
+      let text = snapshot.text;
+      if (streamTruncated) {
+        const separator = contentType.includes("text/event-stream")
+          ? /\r?\n\r?\n/g
+          : /\n/g;
+        const boundaries = [...text.matchAll(separator)];
+        const boundary = boundaries.at(-1);
+        text = boundary
+          ? text.slice(0, boundary.index + boundary[0].length)
+          : "";
+      }
+      upstreamPayload = decodeResponse(text, contentType);
     } catch (error) {
       if (error instanceof RequestError && error.status === 413)
         throw new RequestError(
@@ -205,15 +244,25 @@ export async function handleRead(
     }
     if (
       operationId === "getTeams" &&
-      result &&
-      typeof result === "object" &&
-      "teams" in result &&
-      Array.isArray(result.teams)
+      upstreamPayload &&
+      typeof upstreamPayload === "object" &&
+      "teams" in upstreamPayload &&
+      Array.isArray(upstreamPayload.teams)
     )
-      result.teams = result.teams.filter(
+      upstreamPayload.teams = upstreamPayload.teams.filter(
         (team: { id?: string }) => team.id === teamId,
       );
-    return jsonResponse(redact(result, [serviceKey, upstreamToken]));
+    const clientResponse = jsonResponse(
+      redact(upstreamPayload, [serviceKey, upstreamToken]),
+    );
+    if (streaming) {
+      clientResponse.headers.set(
+        "X-Vercel-Read-Stream-Complete",
+        String(!streamTruncated),
+      );
+      clientResponse.headers.set("X-Vercel-Read-Snapshot-Ms", "5000");
+    }
+    return clientResponse;
   } catch (error) {
     if (error instanceof RequestError)
       return jsonResponse(

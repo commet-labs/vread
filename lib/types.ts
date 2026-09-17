@@ -27,4 +27,5 @@ export interface Operation {
 export interface ReadOperation extends Operation {
   access: "read" | "blocked";
   reason: string;
+  forcedQuery?: Record<string, string>;
 }

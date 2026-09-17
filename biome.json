@@ -7,7 +7,9 @@
       "!!catalog/operations.json",
       "!!catalog/openapi.json",
       "!!pnpm-lock.yaml",
-      "!!next-env.d.ts"
+      "!!next-env.d.ts",
+      "!!.next",
+      "!!.vercel"
     ]
   },
   "formatter": {
@@ -23,5 +25,10 @@
     "formatter": {
       "quoteStyle": "double"
     }
+  },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
   }
 }

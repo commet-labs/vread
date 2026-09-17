@@ -247,3 +247,93 @@ test("secret fields, containers and embedded known credentials never survive pro
   assert.equal(encoded.includes("user:pass"), false);
   assert.ok(encoded.includes('"id":"prj_test"'));
 });
+
+test("sandbox reads cannot resume workloads and owner selectors are server-owned", () => {
+  const sandbox = resolveOperation("getNamedSandbox", "GET");
+  assert.throws(
+    () =>
+      buildUpstreamRequest(
+        sandbox,
+        new URLSearchParams({ name: "test", resume: "true" }),
+        undefined,
+        teamId,
+      ),
+    RequestError,
+  );
+  assert.throws(
+    () =>
+      buildUpstreamRequest(
+        sandbox,
+        new URLSearchParams({ name: "test", resume: "false" }),
+        undefined,
+        teamId,
+      ),
+    RequestError,
+  );
+  assert.equal(
+    buildUpstreamRequest(
+      sandbox,
+      new URLSearchParams({ name: "test" }),
+      undefined,
+      teamId,
+    ).url.searchParams.get("resume"),
+    "false",
+  );
+  const virtualModel = resolveOperation(
+    "getAiGatewayVirtualModelConfig",
+    "GET",
+  );
+  assert.throws(
+    () =>
+      buildUpstreamRequest(
+        virtualModel,
+        new URLSearchParams({ ownerId: "team_other" }),
+        undefined,
+        teamId,
+      ),
+    RequestError,
+  );
+  assert.equal(
+    buildUpstreamRequest(
+      virtualModel,
+      new URLSearchParams(),
+      undefined,
+      teamId,
+    ).url.searchParams.get("ownerId"),
+    teamId,
+  );
+});
+
+test("wire query values preserve string-number unions and validate numeric scalars", () => {
+  const repositories = resolveOperation("searchRepo", "GET");
+  assert.equal(
+    buildUpstreamRequest(
+      repositories,
+      new URLSearchParams({ namespaceId: "123", provider: "github" }),
+      undefined,
+      teamId,
+    ).url.searchParams.get("namespaceId"),
+    "123",
+  );
+  const deployments = resolveOperation("getDeployments", "GET");
+  assert.equal(
+    buildUpstreamRequest(
+      deployments,
+      new URLSearchParams({ limit: "10" }),
+      undefined,
+      teamId,
+    ).url.searchParams.get("limit"),
+    "10",
+  );
+  for (const limit of ["", "NaN", "Infinity", "abc"])
+    assert.throws(
+      () =>
+        buildUpstreamRequest(
+          deployments,
+          new URLSearchParams({ limit }),
+          undefined,
+          teamId,
+        ),
+      RequestError,
+    );
+});
