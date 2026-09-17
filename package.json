@@ -1,8 +1,8 @@
 {
   "name": "vercel-read",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Read-only HTTP access to the Vercel REST API.",
+  "description": "GET-only HTTP proxy for the Vercel REST API.",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -24,9 +24,7 @@
   "dependencies": {
     "next": "16.3.5",
     "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1"
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

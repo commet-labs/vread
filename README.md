@@ -1,47 +1,29 @@
 # vercel-read
 
-One HTTP API for reading Vercel from scripts, people, and agents. Built with Next.js Route Handlers. It wraps the **Vercel REST API**, not the CLI or MCP.
+A thin, authenticated **GET-only proxy** for the Vercel REST API, built with Next.js Route Handlers.
 
-The service holds one upstream Vercel token. Clients receive a separate service key and can invoke only the operations in a reviewed, versioned catalog. They cannot supply arbitrary URLs, HTTP methods, upstream headers, team IDs, or credentials.
-
-## Use
+Change the API origin and use your service key. Keep Vercel's original paths and query parameters:
 
 ```sh
-curl "$VERCEL_READ_URL/api/getProject?idOrName=vercel-read" \
-  -H "Authorization: Bearer $VERCEL_READ_API_KEY"
-
-curl "$VERCEL_READ_URL/api/getDeployments?projectId=prj_example&limit=10" \
+curl "$VERCEL_READ_URL/v9/projects/vercel-read?teamId=team_example" \
   -H "Authorization: Bearer $VERCEL_READ_API_KEY"
 ```
 
-Endpoints use Vercel's `operationId`. Both upstream path parameters and query parameters become query parameters on this API. Team and owner parameters are supplied by the server. Sandbox `resume` is forced to false and cannot be supplied by clients. Use IDs instead of URL-encoded paths or slash-containing names.
+## Behavior
 
-- `GET /openapi.json`: public OpenAPI 3.0 contract for enabled operations.
-- `GET /operations`: public inventory of enabled and blocked reads, with reasons.
-- `GET /health`: process liveness, not proof that upstream credentials work.
-- `GET /api/{operationId}`: a reviewed upstream GET or HEAD operation.
-- `POST /api/{operationId}`: only an explicitly reviewed JSON read query.
+- Every GET path is forwarded to `https://api.vercel.com`, including paths not yet in the pinned documentation.
+- POST, PUT, PATCH, DELETE, HEAD and OPTIONS return `405 Method Not Allowed` without reaching Vercel.
+- Vercel receives its own server-held token; callers authenticate with a separate service key.
+- Paths and query strings are preserved. No team injection, parameter validation, operation blocklist or response redaction.
+- Upstream statuses and response bodies are preserved, including errors, redirects, binary data and live streams. No JSON reformatting, error envelopes, status remapping, snapshots or response-size cap is added by the application.
+- Redirects are returned to the caller, never followed by the proxy.
+- Transport headers and content encoding/length are managed by the HTTP runtime. Responses use `Cache-Control: private, no-store` so authenticated data cannot enter a shared cache.
+- Request content negotiation, range, conditional and documented artifact-client headers are forwarded. Caller cookies, authorization, method-override and internal proxy headers are not forwarded.
+- Only proxy authentication/configuration failures, rejected methods and connection failures produce proxy errors. Upstream Vercel errors pass through unchanged.
 
-GET operations reject POST, PUT, PATCH, DELETE, HEAD and OPTIONS. Public GET operations wrapping upstream HEAD return JSON status metadata. Five upstream POST queries are allowed: artifact metadata, bulk domain pricing, bulk domain availability, domain search, and observability queries. No deploy, purchase, update, delete, token minting, command execution, or generic HTTP proxy operation exists.
+`GET /openapi.json` is the one reserved local endpoint. It documents the 167 GET operations in the pinned September 17, 2026 public Vercel specification, preserving native parameter and response schemas. Only the server URL and authentication scheme are changed. Other paths use Vercel directly.
 
-```sh
-curl "$VERCEL_READ_URL/api/getBulkAvailability" \
-  -H "Authorization: Bearer $VERCEL_READ_API_KEY" \
-  -H 'Content-Type: application/json' \
-  --data '{"domains":["example.com"]}'
-```
-
-Observability queries use the configured team automatically; clients cannot submit `scope`. Ordinary pagination parameters are preserved. Responses omit credential-bearing fields, so they are not byte-for-byte copies of Vercel's responses.
-
-## Coverage
-
-The pinned public [Vercel OpenAPI catalog](https://openapi.vercel.sh/) was retrieved on September 17, 2026. All 171 GET/HEAD operations and six POST reads have an explicit decision: **162 enabled, 15 blocked**. See `/operations` or [catalog/policy.json](catalog/policy.json).
-
-“All reads” does not mean exporting credentials. Decrypted environment variables, config contents/backups, bearer-token lists, domain transfer authorization codes, sandbox files, deployment source files, and binary artifact/image downloads are deliberately unavailable. Reading them could hand a caller the capability to write elsewhere. This service never downloads environment variables.
-
-Reads still depend on the upstream token's permissions, Vercel plan, endpoint availability and rate limits. The catalog covers the public REST snapshot, not undocumented dashboard APIs. It does not claim a live success check for every endpoint. Streaming logs are returned as five-second bounded JSON snapshots. `X-Vercel-Read-Stream-Complete: false` marks a snapshot cut short by the time or size limit; incomplete trailing records are omitted. Binary responses are rejected. Queries must complete within 45 seconds and return at most 2 MiB; JSON request bodies are limited to 64 KiB and URLs to 8 KiB. Narrow queries and paginate large results.
-
-## Run locally
+## Configuration
 
 Requires Node.js 24 and pnpm 10.32.1.
 
@@ -51,20 +33,16 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-Set these values privately, never in source control:
-
 | Variable | Purpose |
 | --- | --- |
-| `VERCEL_READ_API_KEY` | A random service credential of at least 32 characters, shared only with authorized consumers. |
-| `VERCEL_UPSTREAM_TOKEN` | Your Vercel API token, held exclusively by the service. Use a dedicated token scoped to the intended team. |
-| `VERCEL_TEAM_ID` | The fixed `team_...` identifier. Clients cannot override it. |
-| `VERCEL_TEAM_SLUG` | The matching team slug, required for container-registry path operations. |
+| `VERCEL_READ_API_KEY` | Random service credential of at least 32 characters. |
+| `VERCEL_UPSTREAM_TOKEN` | Dedicated Vercel token held only by this service. |
 
-Generate a service credential with `openssl rand -hex 32`. It must differ from the upstream token. Missing configuration fails closed. OAuth is not required. Do not distribute the upstream token to consumers.
+Generate the service credential with `openssl rand -hex 32`. The two keys must differ. Missing configuration fails closed. No OAuth is needed. Vercel permissions and plan limits still apply.
 
 ## Eve and other clients
 
-All clients use this same API. An Eve connection can consume the published contract:
+All consumers use the same HTTP API. Eve can consume its OpenAPI document:
 
 ```ts
 import { defineOpenAPIConnection } from "eve/connections";
@@ -72,7 +50,7 @@ import { defineOpenAPIConnection } from "eve/connections";
 export default defineOpenAPIConnection({
   spec: "https://YOUR-SERVICE/openapi.json",
   baseUrl: "https://YOUR-SERVICE",
-  description: "Read Vercel project, deployment, log and account metadata.",
+  description: "GET requests to the Vercel API.",
   auth: {
     getToken: async () => {
       const token = process.env.VERCEL_READ_API_KEY;
@@ -83,36 +61,26 @@ export default defineOpenAPIConnection({
 });
 ```
 
-Eve, Codex, shell scripts and other HTTP clients receive only the service key. No second implementation or new MCP is needed. Client connections are not installed automatically.
+Vercel paths remain unchanged for scripts, HTTP clients and agents. There is no MCP or separate agent implementation.
+
+## Important scope
+
+**GET-only does not mean free of side effects or secrets.** This intentionally includes environment/credential reads and Vercel's sandbox GET with `resume=true`, which can create a sandbox. The proxy enforces the HTTP method, not the semantics of upstream endpoints. Give its service key only to consumers trusted with everything accessible through GET using the upstream token. Never expose a deployment without authentication.
+
+No response redaction is performed. Keep runtime administration and the upstream token out of agent sandboxes. Reads can incur upstream usage charges. See [SECURITY.md](SECURITY.md).
 
 ## Deploy
 
-Import this repository into a **new** Vercel project with the Next.js preset and Node.js 24. Configure the four variables for production, keeping the two credentials as sensitive secrets, then deploy. Use the Git integration for future deployments. Production API clients use the service bearer key; Vercel preview protection can remain enabled.
+Import this repository into a Vercel project using the Next.js preset and Node.js 24. Set both variables as sensitive production secrets and deploy. Do not expose production credentials to untrusted preview builds. Git integration handles future deployments when connected. Rotate keys separately and redeploy as needed.
 
-Do not give agents repository write access, deployment privileges, environment access, or an administrative Vercel credential for this service. Otherwise they can modify the policy or obtain its token. Configure upstream credentials only in trusted environments; do not expose production secrets to untrusted pull-request previews. Rotate the service key and redeploy to revoke client access. Rotate the upstream token separately when it expires or is exposed.
+The application streams responses until completion or client cancellation; hosting-provider duration, payload and bandwidth limits still apply. The configured Vercel function duration is 300 seconds, subject to the plan's limits.
 
-## Security boundary
+## Catalog and validation
 
-The enforced boundary is the operation catalog and request builder in this service, not a prompt or a read-only flag on a full-access Vercel token. The token itself may retain write permissions. Only reviewed read methods reach a fixed HTTPS origin, redirects are not followed, incoming headers are never forwarded, and errors do not disclose upstream response bodies.
-
-Secret fields and known credential patterns are removed recursively. **Redaction cannot prove arbitrary application logs contain no unknown secrets.** Treat logs and returned business data as sensitive, keep secrets out of logs, and restrict service access accordingly. This software cannot protect against a compromised service administrator, an upstream endpoint changing behavior, or a framework vulnerability. See [SECURITY.md](SECURITY.md).
-
-## Maintain the catalog
-
-[catalog/upstream.json](catalog/upstream.json) stores normalized operation/input metadata plus the source SHA-256, URL and retrieval date. Response schemas are intentionally not copied because responses are projected. Runtime never downloads a changing upstream specification.
-
-Review upstream changes before editing the snapshot. Add an explicit `read` or `blocked` decision with a reason in `catalog/policy.json`, then run:
+`catalog/upstream.json` contains the pinned public GET specification, source URL, retrieval date and full original download SHA-256. Runtime forwarding does not depend on this catalog. After updating the snapshot, regenerate the documented GET surface:
 
 ```sh
 pnpm catalog:generate
-pnpm catalog:check
-```
-
-New GET/HEAD operations without a decision fail generation; new POST operations are unavailable until explicitly reviewed. Mutation operations must never be added to the read policy. Generated files are committed, and CI rejects drift.
-
-## Validate
-
-```sh
 pnpm catalog:check
 pnpm lint
 pnpm test:unit
@@ -121,8 +89,6 @@ pnpm typecheck
 pnpm test:e2e
 ```
 
-Unit tests exercise real pure authorization, request-building and redaction decisions. HTTP E2E tests start the real production Next.js server and substitute only the external Vercel transport with a deterministic fixture. They verify rejected calls never reach upstream, valid requests carry only the upstream key, and redirects/secrets are blocked. These tests do not contact Vercel or require credentials. Live smoke tests must target a specifically authorized project and never issue mutations to test rejection.
+Unit tests cover service authentication and fixed-origin URL construction. E2E tests exercise the real Next.js HTTP server with only the external Vercel transport simulated. They verify native errors, statuses, headers, bytes and streaming, GET forwarding without filters, and rejection of other methods. Tests never call Vercel; external networking is rejected by the fixture.
 
-## License
-
-MIT. This is an independent project, not an official Vercel product. Vercel names and marks belong to their owners. Public API metadata comes from the linked upstream specification. The repository is initially private; changing its visibility requires explicit maintainer approval.
+MIT. Independent project, not an official Vercel product. Vercel names and public API metadata belong to their respective owners. This repository remains private until explicitly authorized to publish.

@@ -4,8 +4,8 @@
   "buildCommand": "pnpm build",
   "installCommand": "pnpm install --frozen-lockfile",
   "functions": {
-    "app/api/[operationId]/route.ts": {
-      "maxDuration": 60
+    "app/[[...path]]/route.ts": {
+      "maxDuration": 300
     }
   }
 }

@@ -1,19 +1,19 @@
 # vercel-read
 
-One shared HTTP service wrapping the public Vercel REST API. No CLI execution or MCP server.
+One thin Next.js HTTP proxy for the Vercel REST API.
 
-## Security contract
+## Contract
 
-- Only explicitly reviewed catalog operations can reach the fixed upstream origin.
-- Never expose upstream credentials, environment variables, arbitrary URLs, forwarded client headers, or mutation operations.
-- New upstream operations remain unavailable until reviewed in catalog/policy.json.
-- Never add an unsafe mode, generic proxy, decryption option, or agent-controlled destination.
-- Runtime credentials stay out of agent sandboxes. Service administrators remain trusted.
-- Changes that broaden access require security review and tests through the HTTP boundary.
-- Tests and smoke checks must target only the vercel-read Vercel project unless the human explicitly authorizes another project.
+- Forward every authenticated GET to the fixed api.vercel.com origin.
+- Preserve native paths, query strings, upstream statuses, errors, response bodies and streams.
+- Reject every other HTTP method, including HEAD and OPTIONS.
+- Do not add operation blocklists, parameter policies, response redaction, error rewriting or snapshot conversion without explicit user authorization.
+- Keep the upstream credential server-side; callers use a separate service key.
+- GET can expose secrets and trigger upstream side effects. Never describe this as a semantic read-only guarantee.
+- Do not access Vercel or other projects unless the human restores authorization. Current work is local and GitHub only.
 
-## Development
+## Delivery
 
-Use Node.js 24 and pnpm. Run `pnpm catalog:check`, `pnpm lint`, `pnpm test:unit`, `pnpm build`, `pnpm typecheck`, and `pnpm test:e2e` before delivery. Unit tests protect pure policy decisions. E2E tests use the real Next.js HTTP server; never test mutation rejection against Vercel itself.
+Use Node.js 24 and pnpm. Run catalog:check, lint, test:unit, build, typecheck and test:e2e. HTTP E2E uses the real Next.js server with only external Vercel simulated and no external network calls.
 
-Use conventional commits, English artifacts, and no AI attribution. Keep the GitHub repository private until explicitly authorized to publish it.
+Use conventional commits, English artifacts and no AI attribution. Keep the repository private until publication is explicitly authorized.

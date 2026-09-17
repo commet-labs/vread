@@ -10,57 +10,69 @@ globalThis.fetch = async (input, init) => {
   }
   const headers = new Headers(init?.headers);
   console.log(
-    `UPSTREAM_FIXTURE ${JSON.stringify({
-      path: url.pathname,
-      method: init?.method,
-      teamId: url.searchParams.get("teamId"),
-      resume: url.searchParams.get("resume"),
-      clientHeader: headers.has("x-client-injection"),
-      correctToken:
-        headers.get("authorization") === "Bearer upstream_fixture_credential",
-      redirect: init?.redirect,
-      body: init?.body,
-    })}`,
+    `UPSTREAM_FIXTURE ${JSON.stringify({ path: url.pathname, query: url.search, method: init?.method, correctToken: headers.get("authorization") === "Bearer upstream_fixture_credential", methodOverride: headers.has("x-http-method-override"), range: headers.get("range"), artifactCi: headers.get("x-artifact-client-ci"), artifactInteractive: headers.get("x-artifact-client-interactive"), redirect: init?.redirect })}`,
   );
-  if (url.pathname.endsWith("/runtime-logs"))
+  if (url.pathname === "/fixture/error")
+    return new Response(
+      '{"error":{"code":"deployment_not_found","message":"Deployment does not exist","detail":42}}',
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          "x-vercel-id": "fixture-request",
+        },
+      },
+    );
+  if (url.pathname === "/fixture/rate-limit")
+    return new Response(
+      '{"error":{"code":"rate_limited","message":"Try again later"}}',
+      {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "30" },
+      },
+    );
+  if (url.pathname === "/fixture/server-error")
+    return new Response("upstream failure", {
+      status: 503,
+      headers: { "Content-Type": "text/plain" },
+    });
+  if (url.pathname === "/fixture/redirect")
+    return new Response(null, {
+      status: 307,
+      headers: { Location: "https://example.invalid/target" },
+    });
+  if (url.pathname === "/fixture/not-modified")
+    return new Response(null, { status: 304, headers: { ETag: '"fixture"' } });
+  if (url.pathname === "/fixture/binary")
+    return new Response(new Uint8Array([0, 1, 127, 128, 255]), {
+      status: 206,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Range": "bytes 0-4/10",
+        "Content-Length": "5",
+      },
+    });
+  if (url.pathname === "/fixture/events")
     return new Response(
       new ReadableStream({
         start(controller) {
           controller.enqueue(
             new TextEncoder().encode(
-              '{"message":"Bearer secret"}\n{"message":"incomplete',
+              'event: log\ndata: {"text":"unchanged"}\n\n',
             ),
           );
         },
       }),
-      { headers: { "Content-Type": "application/stream+json" } },
-    );
-  if (url.pathname.endsWith("/redirect"))
-    return new Response(null, {
-      status: 302,
-      headers: { Location: "https://attacker.invalid" },
-    });
-  if (url.pathname.endsWith("/upstream-error"))
-    return Response.json(
-      { error: "upstream_fixture_credential" },
-      { status: 403 },
-    );
-  if (url.pathname.endsWith("/binary"))
-    return new Response("upstream_fixture_credential", {
-      headers: { "Content-Type": "application/octet-stream" },
-    });
-  if (url.pathname.endsWith("/large"))
-    return Response.json({ message: "a".repeat(3 * 1024 * 1024) });
-  if (url.pathname.endsWith("/events"))
-    return new Response(
-      'data: {"text":"Bearer secret"}\n\ndata: {"text":"build complete"}\n\n',
       { headers: { "Content-Type": "text/event-stream" } },
     );
-  return Response.json({
-    id: "prj_fixture",
-    name: "vercel-read",
-    env: [{ value: "sensitive" }],
-    protectionBypass: { secret: "sensitive" },
-    nested: { accessToken: "sensitive", text: "upstream_fixture_credential" },
-  });
+  return new Response(
+    '{ "id": "prj_fixture", "env": [{"value":"unchanged"}], "token": "unchanged" }\n',
+    {
+      headers: {
+        "Content-Type": "application/json",
+        ETag: '"fixture"',
+        "X-Vercel-Id": "fixture-request",
+      },
+    },
+  );
 };
