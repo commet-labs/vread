@@ -2,7 +2,7 @@
 
 Self-host a GET-only proxy for the Vercel REST API. Give your scripts and agents one service URL and key while keeping your Vercel token on your server. No database, OAuth flow, dashboard or separate MCP server is required.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcommet-labs%2Fvread&project-name=vread&repository-name=vread&env=VERCEL_READ_API_KEY,VERCEL_UPSTREAM_TOKEN&envDescription=Use%20a%20random%20service%20key%20and%20a%20different%20Vercel%20token.&envLink=https%3A%2F%2Fgithub.com%2Fcommet-labs%2Fvread%23configuration)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fcommet-labs%2Fvread&project-name=vread&repository-name=vread&env=VREAD_API_KEY,VREAD_UPSTREAM_TOKEN&envDescription=Use%20a%20random%20service%20key%20and%20a%20different%20Vercel%20token.&envLink=https%3A%2F%2Fgithub.com%2Fcommet-labs%2Fvread%23configuration)
 
 ## Configuration
 
@@ -10,10 +10,10 @@ Every installation uses its own two secrets. Neither is needed to build the appl
 
 | Variable | Purpose |
 | --- | --- |
-| `VERCEL_READ_API_KEY` | Your random service key, at least 32 characters. Give this to clients. |
-| `VERCEL_UPSTREAM_TOKEN` | Your Vercel access token. Keep this only on the server. |
+| `VREAD_API_KEY` | Your random service key, at least 32 characters. Give this to clients. |
+| `VREAD_UPSTREAM_TOKEN` | Your Vercel access token. Keep this only on the server. |
 
-Generate a service key with `openssl rand -hex 32`. Create a dedicated [Vercel access token](https://vercel.com/account/settings/tokens) with the scope you need. The keys must differ. Vercel permissions and plan limits still apply. The existing environment variable names remain unchanged by the VRead rename.
+Generate a service key with `openssl rand -hex 32`. Create a dedicated [Vercel access token](https://vercel.com/account/settings/tokens) with the scope you need. The keys must differ. Vercel permissions and plan limits still apply. Use these VREAD-prefixed names in both your hosting settings and clients. If updating an earlier installation, rename its two environment variables before restarting.
 
 ## Deploy to Vercel
 
@@ -69,11 +69,11 @@ To update, pull your chosen revision, install with the frozen lockfile, rebuild,
 
 ## Use your instance
 
-Set `VREAD_URL` to your instance's HTTPS origin and `VERCEL_READ_API_KEY` to its service key in your client environment:
+Set `VREAD_URL` to your instance's HTTPS origin and `VREAD_API_KEY` to its service key in your client environment:
 
 ```sh
 curl "$VREAD_URL/v9/projects?teamId=team_example" \
-  -H "Authorization: Bearer $VERCEL_READ_API_KEY"
+  -H "Authorization: Bearer $VREAD_API_KEY"
 ```
 
 Keep Vercel's original paths, versions and query parameters. VRead does not pin you to v9. Omit or change `teamId` as appropriate for your token. A POST, PUT, PATCH, DELETE, HEAD or OPTIONS request returns 405 without reaching Vercel.

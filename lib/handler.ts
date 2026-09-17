@@ -62,7 +62,7 @@ export function rejectMethod(): Response {
 
 export async function handleGet(request: Request): Promise<Response> {
   if (request.method !== "GET") return rejectMethod();
-  const serviceKey = process.env.VERCEL_READ_API_KEY;
+  const serviceKey = process.env.VREAD_API_KEY;
   if (!serviceKey || serviceKey.length < 32)
     return proxyError(
       503,
@@ -75,7 +75,7 @@ export async function handleGet(request: Request): Promise<Response> {
       "unauthorized",
       "A valid service API key is required.",
     );
-  const token = process.env.VERCEL_UPSTREAM_TOKEN;
+  const token = process.env.VREAD_UPSTREAM_TOKEN;
   if (!token || token === serviceKey)
     return proxyError(
       503,
