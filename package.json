@@ -1,0 +1,39 @@
+{
+  "name": "vercel-read",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Read-only HTTP access to the Vercel REST API.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "catalog:generate": "tsx scripts/generate-catalog.ts",
+    "catalog:check": "tsx scripts/generate-catalog.ts --check",
+    "test:unit": "tsx --test lib/*.test.ts",
+    "test:e2e": "tsx --test tests/*.spec.ts"
+  },
+  "dependencies": {
+    "next": "16.3.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.9.3",
+    "tsx": "^4.21.0",
+    "@biomejs/biome": "^2.4.0"
+  }
+}
