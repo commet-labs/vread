@@ -4,7 +4,7 @@ One thin Next.js HTTP proxy for the Vercel REST API.
 
 ## Contract
 
-- Forward every authenticated GET to the fixed api.vercel.com origin.
+- Forward authenticated GET requests to the fixed api.vercel.com origin. The code-configured operation allowlist is disabled by default; when enabled, deny unlisted routes before fetching and expose only allowed operations in OpenAPI.
 - Preserve native paths, query strings, upstream statuses, errors, response bodies and streams.
 - Reject every other HTTP method, including HEAD and OPTIONS.
 - Do not add operation blocklists, parameter policies, response redaction, error rewriting or snapshot conversion without explicit user authorization.

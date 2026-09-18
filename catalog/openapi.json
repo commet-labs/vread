@@ -3,7 +3,7 @@
   "info": {
     "title": "VRead",
     "version": "0.2.0",
-    "description": "GET-only proxy for Vercel. Native routes, parameters, response bodies, errors and streams. No operation filtering or redaction.",
+    "description": "GET-only proxy for Vercel. Native routes, parameters, response bodies, errors and streams. Optional server-configured operation allowlist. No response redaction.",
     "license": {
       "name": "MIT"
     }

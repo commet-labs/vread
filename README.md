@@ -80,13 +80,32 @@ Keep Vercel's original paths, versions and query parameters. VRead does not pin 
 
 Agents and OpenAPI clients can use `https://YOUR-INSTANCE/openapi.json` with your instance origin as their base URL and your service key as bearer authentication. All clients use this one HTTP API.
 
+## Optional operation allowlist
+
+Edit [`access-policy.ts`](access-policy.ts) in your own copy, then rebuild and redeploy:
+
+```ts
+export default {
+  enabled: true,
+  allowedOperations: ["getProjects", "getDeployment"],
+};
+```
+
+It is **disabled by default**, preserving unrestricted GET forwarding. When enabled, only the listed operation IDs from the pinned catalog are accepted. The example permits `GET /v10/projects` and `GET /v13/deployments/{idOrUrl}`. Other paths and versions return `403 operation_not_allowed` before any upstream request. An empty enabled list denies all upstream requests; misspelled or unknown operation IDs fail configuration validation.
+
+Find operation IDs in [`catalog/openapi.json`](catalog/openapi.json). `/openapi.json` on your instance automatically shows only allowed operations and remains publicly accessible. New API versions or undocumented endpoints require a catalog update before they can be allowed. There are no wildcard operation IDs or client-controlled overrides.
+
+This limits operations, not projects, teams, query parameters or response fields. Permitting an operation permits all its accepted query variants, including side effects such as sandbox `resume=true`. Choose operations accordingly. Allowed bodies, statuses, errors and streams are not redacted or transformed. Encoded path separators, nested encoding and ambiguous path segments are rejected while the allowlist is active; use resource IDs instead of slash-containing URL identifiers.
+
+Only someone able to change and redeploy the server can change this policy. Keep those permissions and the upstream token away from constrained agents.
+
 ## Behavior
 
 
-- Every GET path is forwarded to `https://api.vercel.com`, including paths not yet in the pinned documentation.
+- With the allowlist disabled, every GET path is forwarded to `https://api.vercel.com`, including paths not yet in the pinned documentation.
 - POST, PUT, PATCH, DELETE, HEAD and OPTIONS return `405 Method Not Allowed` without reaching Vercel.
 - Vercel receives its own server-held token; callers authenticate with a separate service key.
-- Paths and query strings are preserved. No team injection, parameter validation, operation blocklist or response redaction.
+- Paths and query strings are preserved. No team injection, query validation or response redaction. The optional allowlist restricts operations before forwarding.
 - Upstream statuses and response bodies are preserved, including errors, redirects, binary data and live streams. No JSON reformatting, error envelopes, status remapping, snapshots or response-size cap is added by the application.
 - Redirects are returned to the caller, never followed by the proxy.
 - Transport headers and content encoding/length are managed by the HTTP runtime. Responses use `Cache-Control: private, no-store` so authenticated data cannot enter a shared cache.
@@ -106,7 +125,7 @@ After installing dependencies and filling `.env.local`, run `pnpm dev`. Developm
 ## Catalog and validation
 
 
-`catalog/upstream.json` contains the pinned public GET specification, source URL, retrieval date and full original download SHA-256. Runtime forwarding does not depend on this catalog. After updating the snapshot, regenerate the documented GET surface:
+`catalog/upstream.json` contains the pinned public GET specification, source URL, retrieval date and full original download SHA-256. Unrestricted forwarding does not depend on this catalog; the optional allowlist uses its exact routes and operation IDs. After updating the snapshot, regenerate the documented GET surface:
 
 ```sh
 pnpm catalog:generate

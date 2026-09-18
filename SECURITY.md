@@ -6,7 +6,7 @@ Report vulnerabilities privately to repository maintainers. Never include live c
 
 This service forwards authenticated GET requests to the fixed origin `https://api.vercel.com`. All other methods are rejected. Caller authorization is replaced with the server-held upstream token, redirects are not followed, and shared caching is disabled.
 
-There is deliberately no operation blocklist, parameter policy or response redaction. GET endpoints can expose secrets or have side effects: Vercel's named-sandbox GET with `resume=true` can create a sandbox. The service is a GET-only proxy, not a semantic read-only authorization boundary. The service key must be treated as granting all GET capabilities of the upstream token.
+The optional server-owned access-policy.ts allowlist limits exact catalog operations and is disabled by default. It does not scope projects, teams or query variants, or redact responses. Unknown routes and versions are denied when enabled. GET endpoints can expose secrets or have side effects: Vercel's named-sandbox GET with `resume=true` can create a sandbox. The service is a GET-only proxy, not a semantic read-only authorization boundary. The service key must be treated as granting all GET capabilities of the upstream token.
 
 Response bodies and Vercel errors pass through unchanged. Arbitrary returned credentials can grant access outside this service. Applications must decide whether consumers are trusted with those capabilities.
 

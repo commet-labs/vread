@@ -29,7 +29,7 @@ const specification = {
     title: "VRead",
     version: "0.2.0",
     description:
-      "GET-only proxy for Vercel. Native routes, parameters, response bodies, errors and streams. No operation filtering or redaction.",
+      "GET-only proxy for Vercel. Native routes, parameters, response bodies, errors and streams. Optional server-configured operation allowlist. No response redaction.",
     license: { name: "MIT" },
   },
   servers: [{ url: "/" }],
@@ -54,5 +54,5 @@ if (process.argv.includes("--check")) {
     throw new Error("Regenerate catalog/openapi.json");
 } else await writeFile(file, serialized);
 console.log(
-  `${Object.keys(paths).length} documented GET operations; runtime forwards all GET paths`,
+  `${Object.keys(paths).length} documented GET operations; optional access-policy.ts restricts runtime operations`,
 );

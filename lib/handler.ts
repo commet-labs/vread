@@ -1,5 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
+import { accessPolicy } from "./access-policy";
+
 const requestHeaders = [
   "accept",
   "accept-language",
@@ -75,6 +77,13 @@ export async function handleGet(request: Request): Promise<Response> {
       "unauthorized",
       "A valid service API key is required.",
     );
+  const destination = upstreamUrl(request.url);
+  if (!accessPolicy.allows(destination))
+    return proxyError(
+      403,
+      "operation_not_allowed",
+      "This GET operation is not allowed.",
+    );
   const token = process.env.VREAD_UPSTREAM_TOKEN;
   if (!token || token === serviceKey)
     return proxyError(
@@ -88,7 +97,7 @@ export async function handleGet(request: Request): Promise<Response> {
     if (value !== null) headers.set(name, value);
   }
   try {
-    const upstream = await fetch(upstreamUrl(request.url), {
+    const upstream = await fetch(destination, {
       method: "GET",
       headers,
       redirect: "manual",

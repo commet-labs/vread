@@ -1,8 +1,8 @@
-import specification from "@/catalog/openapi.json";
+import { accessPolicy } from "@/lib/access-policy";
 import { rejectMethod } from "@/lib/handler";
 
 export function GET() {
-  return Response.json(specification, {
+  return Response.json(accessPolicy.specification, {
     headers: { "Cache-Control": "no-store" },
   });
 }

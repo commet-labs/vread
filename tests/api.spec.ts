@@ -5,6 +5,8 @@ import { createServer } from "node:net";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import configuration from "../access-policy";
+
 const apiKey = "vercel_read_e2e_key_longer_than_32_characters";
 const authorization = `Bearer ${apiKey}`;
 
@@ -58,6 +60,58 @@ test("GET proxy preserves native HTTP contracts and rejects every other method",
     assert.ok(ready, logs);
     const spec = await (await fetch(`${origin}/openapi.json`)).json();
     assert.equal(spec.info.title, "VRead");
+    if (configuration.enabled) {
+      assert.deepEqual(Object.keys(spec.paths).sort(), [
+        "/v10/projects",
+        "/v13/deployments/{idOrUrl}",
+      ]);
+      for (const path of [
+        "/v9/projects",
+        "/v1/projects/example/env/example",
+        "/v2/sandboxes/example?resume=true",
+        "/v13/deployments/a%252fb",
+        "/undocumented",
+      ]) {
+        const blocked = await fetch(`${origin}${path}`, {
+          headers: { authorization },
+        });
+        assert.equal(blocked.status, 403, path);
+        assert.equal(
+          (await blocked.json()).error.code,
+          "operation_not_allowed",
+        );
+      }
+      assert.equal(logs.includes("UPSTREAM_FIXTURE"), false);
+      const allowed = await fetch(
+        `${origin}/v10/projects?limit=1&repeat=a&repeat=b`,
+        {
+          headers: { authorization },
+        },
+      );
+      assert.equal(allowed.status, 200);
+      assert.equal(allowed.headers.get("etag"), '"fixture"');
+      assert.equal(
+        await allowed.text(),
+        '{ "id": "prj_fixture", "env": [{"value":"unchanged"}], "token": "unchanged" }\n',
+      );
+      assert.equal((await fetch(`${origin}/v10/projects`)).status, 401);
+      assert.equal(
+        (
+          await fetch(`${origin}/v10/projects`, {
+            method: "POST",
+            headers: { authorization },
+          })
+        ).status,
+        405,
+      );
+      const calls = logs
+        .split("\n")
+        .filter((line) => line.startsWith("UPSTREAM_FIXTURE "))
+        .map((line) => JSON.parse(line.slice("UPSTREAM_FIXTURE ".length)));
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].query, "?limit=1&repeat=a&repeat=b");
+      return;
+    }
     assert.ok(spec.paths["/v9/projects/{idOrName}"].get.responses["200"]);
     assert.ok(spec.paths["/v1/projects/{idOrName}/env/{id}"].get);
     for (const entry of Object.values(spec.paths)) {
